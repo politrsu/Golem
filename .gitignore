@@ -1,0 +1,8 @@
+.env
+config.json
+runtime/
+*.sqlite3
+*.db
+*.docx
+__pycache__/
+*.pyc
