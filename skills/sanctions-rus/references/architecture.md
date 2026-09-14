@@ -36,6 +36,14 @@ Build the first snapshot as a silent baseline. Compare later snapshots by stable
 - Use bounded timeouts, exponential backoff, circuit breaking, and an independent health notification.
 - Normalize redirect and tracking URLs to the canonical official URL before deduplication.
 
+### Official fallback migration
+
+If an official API is removed, blocked, or persistently unavailable, use another public endpoint owned by the same authority. A server-rendered official page or official downloadable document may replace the API only when it exposes enough information to preserve document identity, version, publication dates, and coverage checks.
+
+For pages that embed server-side application state, extract the exact JSON script payload and parse it before decoding individual text fields. Do not HTML-decode the complete JSON payload: encoded quotation marks inside string values can become bare quotes and corrupt otherwise valid JSON.
+
+Treat a fallback as a parser change. Add fixtures for valid and malformed payloads, run a full notification-free shadow cycle, and verify every required source and jurisdiction before advancing the affected checkpoint. Keep fail-closed behavior unchanged.
+
 ## Storage
 
 Prefer SQLite in WAL mode for a single-host deployment. Keep configuration, secrets, runtime state, snapshots, and generated files outside the skill directory. Back up the database and test restore procedures.

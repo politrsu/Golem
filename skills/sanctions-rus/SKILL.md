@@ -58,7 +58,11 @@ If delivery is temporarily unavailable, retain records in the local outbox. Befo
 
 Follow the state model and failure boundaries in [references/architecture.md](references/architecture.md). Use SQLite or another transactional store for checkpoints, snapshots, pending enrichment, and outboxes. Advance a jurisdiction checkpoint only after its required official source was successfully checked. Return a non-zero service exit code on a critical source or persistence failure and send an independent operational alert.
 
-Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, and duplicate retry. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
+When an official API becomes unavailable or blocks automated requests, migrate only to another public endpoint controlled by the same authority. Prefer a server-rendered official page or official downloadable document. If the page embeds structured application state, parse that state as JSON without HTML-decoding the complete script body first; decode individual extracted text fields instead. Require the same document identity, version, dates, and coverage checks as for the API. Keep the old checkpoint until a full shadow cycle confirms every required source and jurisdiction.
+
+Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, and any fallback parser introduced for an official source. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
+
+After a material monitoring improvement, prepare a sanitized reusable release. Run the package tests and privacy scan, publish only if both pass, and never include production configuration, runtime state, secrets, destinations, logs, or private paths. Keep repository-specific branch and push permissions outside the reusable skill.
 
 ## Input and output
 
