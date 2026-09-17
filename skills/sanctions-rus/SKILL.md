@@ -1,6 +1,6 @@
 ---
 name: "sanctions-rus"
-description: "Monitors official sanctions sources, verifies record-level changes, sends fail-closed alerts, and builds Russian DOCX reports."
+description: "Monitors official sanctions sources, explains full acts in Russian, sends verified alerts first, then Russian DOCX lists."
 ---
 
 # Sanctions RUS
@@ -18,15 +18,35 @@ Use this skill to configure, audit, or run a sanctions-monitoring workflow. Keep
    - existing identifier changes materially: variation/amendment;
    - identifier disappears: revocation/delisting;
    - only timestamps, formatting, aliases, or other non-material technical fields change: correction.
-6. Open the original act and every relevant annex. Count only newly added positions by categories actually present: individuals, entities, vessels, aircraft, banks, ports, or other explicit categories. Do not count aliases or corrected attributes as new positions.
+6. Open the full original act and every relevant annex; a title or landing-page summary is insufficient. Read the operative articles and extract the concrete action, affected regime or instrument, effective date or expiry, affected categories and counts, practical legal effect, and whether the designation list changed. Count only newly added positions by categories actually present: individuals, entities, vessels, aircraft, banks, ports, or other explicit categories. Do not count aliases or corrected attributes as new positions.
 7. Publish only fully structured events. A new-designation alert must contain verified non-zero category counts. A variation or removal alert must identify the affected record, stable ID, and material change. Never render internal event names such as `list_or_notice_update`.
 8. If parsing, download, comparison, or verification fails, keep the discovery in `pending_enrichment`, send an operational health signal, and publish no user alert. Retry idempotently without advancing the verified snapshot.
 9. If the count cannot be verified, say so only in the internal review queue; never invent a number or send a generic list-update alert.
-10. Publish the urgent alert first. Include jurisdiction, event type, date, only non-zero category counts or concrete changed records, and the direct official document URL.
+10. Publish the urgent alert first. Every user-facing alert must contain:
+   - the neutral tag `[САНКЦИИ]` and jurisdiction;
+   - a brief factual description in Russian;
+   - the publication/effective date when verified;
+   - one direct canonical link labelled `Оригинал:`.
+   Do not publish English-only titles, internal event types, raw parser fields, search-engine redirects, generic landing-page text, or vague phrases such as “изменён санкционный режим”. State what the authority actually decided, which instrument and measures are affected, the operative date or term, the practical effect, and whether people, entities, vessels, or other list entries were added, changed, or removed. Put category counts or changed records inside the Russian description.
 11. Mark the alert delivered only after Telegram acknowledges it. Retain failed deliveries in the outbox and retry idempotently.
 12. Translate the complete new list into Russian after a new-designation alert. Translate Ukrainian-language text into Russian as well.
 13. Build a DOCX only for new records, using only non-empty sections. Never print empty headings or phrases such as “не добавлены”. Include positions for individuals and IMO numbers for vessels when available.
 14. Deliver the translated DOCX to the same configured Telegram destination. Its failure must not delay or invalidate the urgent alert. Variations, corrections, and removals do not create a “new list” DOCX unless explicitly configured.
+
+## Alert format
+
+Use this exact structure:
+
+```text
+[САНКЦИИ] <юрисдикция>
+Дата: <дата на русском или ISO YYYY-MM-DD>
+
+<Краткое фактическое описание на русском.>
+
+Оригинал: <прямая официальная ссылка>
+```
+
+For a batch, repeat the same block for each verified event. Use two to four concise sentences when needed to make the act understandable without opening the link. For extensions, state the previous regime, the new expiry date, the measures that remain in force, the stated reason, and whether the list changed. Do not add analysis, predictions, editorial conclusions, or a second link.
 
 ## Publication gate
 
@@ -62,7 +82,7 @@ When an official API becomes unavailable or blocks automated requests, migrate o
 
 For cross-programme actions, do not apply the Russia relevance filter to an index-card title alone. If an official action card announces a designation, list update, amendment, or delisting, fetch the authoritative detail page first. Match changed records to Russian entities using the record body and stable identifiers; parse `old -to- new` rows as variations, including newly added sanctions programmes and secondary-sanctions status. If detail enrichment fails, retain the discovery, fail the source coverage check, and do not advance its checkpoint.
 
-Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, any fallback parser introduced for an official source, and a cross-programme case whose card title omits Russia while the changed record is Russian. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
+Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, Russian alert copy, canonical original-link rendering, any fallback parser introduced for an official source, and a cross-programme case whose card title omits Russia while the changed record is Russian. For designation events, verify the delivery sequence separately: Telegram acknowledges the alert first, then the Russian DOCX is sent. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
 
 After a material monitoring improvement, prepare a sanitized reusable release. Run the package tests and privacy scan, publish only if both pass, and never include production configuration, runtime state, secrets, destinations, logs, or private paths. Keep repository-specific branch and push permissions outside the reusable skill.
 
