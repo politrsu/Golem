@@ -27,7 +27,7 @@ Use this skill to configure, audit, or run a sanctions-monitoring workflow. Keep
    - a brief factual description in Russian;
    - the publication/effective date when verified;
    - one direct canonical link labelled `Оригинал:`.
-   Do not publish English-only titles, internal event types, raw parser fields, search-engine redirects, generic landing-page text, or vague phrases such as “изменён санкционный режим”. State what the authority actually decided, which instrument and measures are affected, the operative date or term, the practical effect, and whether people, entities, vessels, or other list entries were added, changed, or removed. Put category counts or changed records inside the Russian description.
+   `Оригинал:` must be a direct URL to the specific document, act, notice, or record-detail page on the issuing authority's domain. Search engines and aggregators, including `news.google.com`, may be used only for discovery and must never appear in a user-facing alert. Do not publish English-only titles, internal event types, raw parser fields, search-engine redirects, generic landing-page text, or vague phrases such as “изменён санкционный режим”. State what the authority actually decided, which instrument and measures are affected, the operative date or term, the practical effect, and whether people, entities, vessels, or other list entries were added, changed, or removed. Put category counts or changed records inside the Russian description.
 11. Mark the alert delivered only after Telegram acknowledges it. Retain failed deliveries in the outbox and retry idempotently.
 12. Translate the complete new list into Russian after a new-designation alert. Translate Ukrainian-language text into Russian as well.
 13. Build a DOCX only for new records, using only non-empty sections. Never print empty headings or phrases such as “не добавлены”. Include positions for individuals and IMO numbers for vessels when available.
@@ -55,6 +55,10 @@ The publisher must default to deny:
 - `alertable = false` for unknown, generic, or unparsed events;
 - allow publication only for event types validated by a source-specific adapter;
 - require `structured = true` and the event-specific fields from the normalized contract;
+- require `authority_domain` and a validated `official_url` whose host belongs to that authority and whose path identifies the specific document or detail page;
+- reject search/news wrappers, redirectors, authority homepages, and non-authority hosts before the Telegram outbox;
+- if canonical URL resolution fails, keep the item in `pending_enrichment`, emit a health reason, and publish nothing;
+- make the renderer fail closed if any queued item lacks a valid direct official document URL;
 - keep `detected`, `verified`, and `delivered` as separate durable states;
 - update the authoritative snapshot only after a successful full parse;
 - never mark a discovery consumed merely because a page changed.
@@ -82,7 +86,7 @@ When an official API becomes unavailable or blocks automated requests, migrate o
 
 For cross-programme actions, do not apply the Russia relevance filter to an index-card title alone. If an official action card announces a designation, list update, amendment, or delisting, fetch the authoritative detail page first. Match changed records to Russian entities using the record body and stable identifiers; parse `old -to- new` rows as variations, including newly added sanctions programmes and secondary-sanctions status. If detail enrichment fails, retain the discovery, fail the source coverage check, and do not advance its checkpoint.
 
-Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, Russian alert copy, canonical original-link rendering, any fallback parser introduced for an official source, and a cross-programme case whose card title omits Russia while the changed record is Russian. For designation events, verify the delivery sequence separately: Telegram acknowledges the alert first, then the Russian DOCX is sent. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
+Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, Russian alert copy, canonical original-link rendering, rejection of a `news.google.com` wrapper, rejection of a non-authority host, acceptance of a direct authority document URL, any fallback parser introduced for an official source, and a cross-programme case whose card title omits Russia while the changed record is Russian. For designation events, verify the delivery sequence separately: Telegram acknowledges the alert first, then the Russian DOCX is sent. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
 
 After a material monitoring improvement, prepare a sanitized reusable release. Run the package tests and privacy scan, publish only if both pass, and never include production configuration, runtime state, secrets, destinations, logs, or private paths. Keep repository-specific branch and push permissions outside the reusable skill.
 
@@ -91,6 +95,7 @@ After a material monitoring improvement, prepare a sanitized reusable release. R
 Use the normalized event contract in [references/event-contract.md](references/event-contract.md). Render a document with:
 
 ```bash
+python3 scripts/validate_event.py event.json
 python3 scripts/render_docx.py event.json sanctions-list.docx
 ```
 

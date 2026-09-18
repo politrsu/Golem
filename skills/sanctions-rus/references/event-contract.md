@@ -1,6 +1,6 @@
 # Normalized event contract
 
-All publishable events require `structured: true`, a stable `event_id`, jurisdiction, dates, direct official URL, and source parser version.
+All publishable events require `structured: true`, a stable `event_id`, jurisdiction, dates, `authority_domain`, a direct `official_url` on that domain, and source parser version. Discovery URLs belong in internal state only. Search/news wrappers and redirectors must never populate `official_url`.
 
 ## New designations
 
@@ -13,6 +13,7 @@ All publishable events require `structured: true`, a stable `event_id`, jurisdic
   "published_date": "2030-01-02",
   "effective_date": "2030-01-01",
   "title_ru": "Новые санкционные ограничения",
+  "authority_domain": "authority.example",
   "official_url": "https://authority.example/original-act",
   "parser_version": "2",
   "categories": {
@@ -33,6 +34,7 @@ Omit absent categories or use empty arrays internally. Alerts and DOCX output di
   "jurisdiction": "Example jurisdiction",
   "event_type": "variation",
   "published_date": "2030-01-02",
+  "authority_domain": "authority.example",
   "official_url": "https://authority.example/change-notice",
   "parser_version": "2",
   "records": [{
