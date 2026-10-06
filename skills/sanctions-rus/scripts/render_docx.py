@@ -30,6 +30,15 @@ def label(item):
     return name + (" — " + "; ".join(extras) if extras else "")
 
 
+def document_heading(event):
+    """Label an upstream-verified Russia-related event without losing its measure."""
+    heading = (event.get("document_title_ru") or event.get("title_ru")
+               or f"Санкционный список — {event.get('jurisdiction', '')}".rstrip(" —"))
+    if "антироссийск" not in heading.casefold():
+        heading = f"Антироссийские санкции – {heading}"
+    return heading
+
+
 def main():
     if len(sys.argv) != 3:
         raise SystemExit("Usage: render_docx.py EVENT.json OUTPUT.docx")
@@ -40,7 +49,7 @@ def main():
     document = Document()
     document.core_properties.author = ""
     document.core_properties.last_modified_by = ""
-    document.add_heading(event.get("title_ru", "Санкционный список"), 0)
+    document.add_heading(document_heading(event), 0)
     for key, items in event.get("categories", {}).items():
         if not items:
             continue

@@ -1,11 +1,13 @@
 ---
 name: "sanctions-rus"
-description: "Monitors official sanctions sources, explains full acts in Russian, sends verified alerts first, then Russian DOCX lists."
+description: "Monitors official Russia-related sanctions sources, explains full acts in Russian, and prepares verified alerts and Russian DOCX lists under the user's publication policy."
 ---
 
 # Sanctions RUS
 
-Use this skill to configure, audit, or run a sanctions-monitoring workflow. Keep urgent detection deterministic. Run translation and document preparation only after a verified, structured event exists.
+Use this skill to configure, audit, or run Russia-related sanctions monitoring, including measures on third-country entities under Russia-related regimes. Establish relevance from the official regime and full document; an entity's country alone does not determine scope. Do not relabel unrelated sanctions as Russia-related. Keep urgent detection deterministic. Run translation and document preparation only after a verified, structured event exists.
+
+This package provides instructions, onboarding, basic event/URL validation, and a DOCX renderer. The collector, source adapters, transactional outboxes, admission controller, and scheduler are deployment responsibilities; the reference requirements below do not mean those components are bundled or their live behavior has been verified here.
 
 ## Operating contract
 
@@ -22,15 +24,15 @@ Use this skill to configure, audit, or run a sanctions-monitoring workflow. Keep
 7. Publish only fully structured events. A new-designation alert must contain verified non-zero category counts. A variation or removal alert must identify the affected record, stable ID, and material change. Never render internal event names such as `list_or_notice_update`.
 8. If parsing, download, comparison, or verification fails, keep the discovery in `pending_enrichment`, send an operational health signal, and publish no user alert. Retry idempotently without advancing the verified snapshot.
 9. If the count cannot be verified, say so only in the internal review queue; never invent a number or send a generic list-update alert.
-10. Publish the urgent alert first. Every user-facing alert must contain:
+10. Under an authorized alert-and-document policy, publish the urgent alert first. Preserve an existing documents-only policy, pauses, cutoff, and delivery owner; installing or updating the skill grants no publication permission. Every authorized user-facing alert must contain:
    - the neutral tag `[САНКЦИИ]` and jurisdiction;
    - a brief factual description in Russian;
    - the publication/effective date when verified;
    - one direct canonical link labelled `Оригинал:`.
    `Оригинал:` must be a direct URL to the specific document, act, notice, or record-detail page on the issuing authority's domain. Search engines and aggregators, including `news.google.com`, may be used only for discovery and must never appear in a user-facing alert. Do not publish English-only titles, internal event types, raw parser fields, search-engine redirects, generic landing-page text, or vague phrases such as “изменён санкционный режим”. State what the authority actually decided, which instrument and measures are affected, the operative date or term, the practical effect, and whether people, entities, vessels, or other list entries were added, changed, or removed. Put category counts or changed records inside the Russian description.
-11. Mark the alert delivered only after Telegram acknowledges it. Retain failed deliveries in the outbox and retry idempotently.
-12. Translate the complete new list into Russian after a new-designation alert. Translate Ukrainian-language text into Russian as well.
-13. Build a DOCX only for new records, using only non-empty sections. Never print empty headings or phrases such as “не добавлены”. Include positions for individuals and IMO numbers for vessels when available.
+11. Mark delivery complete only after a validated platform receipt bound to the intended destination and content. Persist send intent before calling the sender. An unknown outcome stays in `review_required` without automatic resend; reconcile durable receipts first. Only a definite negative acknowledgement or proof that no send was attempted permits automatic retry. See [delivery recovery](references/architecture.md#delivery-intent-and-recovery).
+12. Translate the complete new list into Russian after the acknowledged new-designation alert when alerts are enabled, or directly from the verified event under an authorized documents-only policy. Translate Ukrainian-language text into Russian as well.
+13. Build a DOCX only for new records, using only non-empty sections. Every document's main heading must explicitly say «Антироссийские санкции», including lists of third-country companies under Russia-related regimes. Use `document_title_ru`, then `title_ru`, then a jurisdiction-bearing fallback; prefix «Антироссийские санкции – » unless the heading already contains `антироссийск` case-insensitively. Preserve the issuing jurisdiction, original title, and true measure type: «Антироссийские санкции – Япония: новые организации под экспортными ограничениями». Export restrictions must not become asset freezes. Never print empty section headings or phrases such as “не добавлены”. Include positions for individuals and IMO numbers for vessels when available.
 14. Deliver the translated DOCX to the same configured Telegram destination. Its failure must not delay or invalidate the urgent alert. Variations, corrections, and removals do not create a “new list” DOCX unless explicitly configured.
 
 ## Alert format
@@ -71,22 +73,24 @@ Read [references/configuration.md](references/configuration.md). A bot cannot cr
 
 - If a dedicated channel exists, require the user to add the bot as an administrator with permission to post, then validate access before activation.
 - If no dedicated channel exists, select `agent_chat` and bind delivery to the user's current primary agent conversation. Send both alerts and DOCX files there.
-- Send a test message and require successful delivery before enabling the scheduler.
+- With explicit authorization for the onboarding test, send a test message and require successful delivery before enabling the scheduler. A skill update alone does not authorize a test send.
 - Store the bot token only in an environment variable or secret manager. Keep channel identifiers in local configuration, never in the skill or repository.
 
 For a standalone Telegram bot, run `python3 scripts/configure.py --config ./config.json --mode agent_chat --destination ... --verify` and supply the current private-chat identifier. In an agent platform, use its current-conversation binding instead of copying a numeric identifier into the repository. For a channel, use `--mode channel --destination ... --verify`.
 
-If delivery is temporarily unavailable, retain records in the local outbox. Before reconnecting any destination, ask how to handle queued records: review and publish selected records, publish all, or establish a current baseline without publishing history. Default to review; never flood a destination automatically.
+If delivery is temporarily unavailable, retain records and send evidence in the local outbox. Before reconnecting any destination, use the user's explicit queued-record policy or obtain one: review and publish selected records, publish all, or establish a current baseline without publishing history. Default to review; never flood a destination automatically. Recovered historical events stay held unless specifically authorized, and publication permission does not resolve an unknown prior send. Keep one delivery owner; a repair or enrichment worker must not independently replay or send completion callbacks owned by its launcher.
 
 ## Reliability rules
 
-Follow the state model and failure boundaries in [references/architecture.md](references/architecture.md). Use SQLite or another transactional store for checkpoints, snapshots, pending enrichment, and outboxes. Advance a jurisdiction checkpoint only after its required official source was successfully checked. Return a non-zero service exit code on a critical source or persistence failure and send an independent operational alert.
+Follow the state model and failure boundaries in [references/architecture.md](references/architecture.md). Use SQLite or another transactional store for checkpoints, snapshots, pending enrichment, and outboxes. Report fetch coverage, semantic coverage, and delivery-inclusive health separately. Advance a semantic jurisdiction checkpoint only after all required sources have been completely processed or explicitly classified outside scope from full documents. A successful fetch, quiet cycle, or old receipt does not prove processing or new delivery. Return a non-zero service exit code on a critical source or persistence failure and use the configured authorized operational-alert route.
+
+For source-specific changes, read [references/source-adapters.md](references/source-adapters.md). Keep bounded deterministic collection possible during model work using the deployment's approved resource admission rules; do not release another owner's lease, raise limits, or change models to make a check pass.
 
 When an official API becomes unavailable or blocks automated requests, migrate only to another public endpoint controlled by the same authority. Prefer a server-rendered official page or official downloadable document. If the page embeds structured application state, parse that state as JSON without HTML-decoding the complete script body first; decode individual extracted text fields instead. Require the same document identity, version, dates, and coverage checks as for the API. Keep the old checkpoint until a full shadow cycle confirms every required source and jurisdiction.
 
 For cross-programme actions, do not apply the Russia relevance filter to an index-card title alone. If an official action card announces a designation, list update, amendment, or delisting, fetch the authoritative detail page first. Match changed records to Russian entities using the record body and stable identifiers; parse `old -to- new` rows as variations, including newly added sanctions programmes and secondary-sanctions status. If detail enrichment fails, retain the discovery, fail the source coverage check, and do not advance its checkpoint.
 
-Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, Russian alert copy, canonical original-link rendering, rejection of a `news.google.com` wrapper, rejection of a non-authority host, acceptance of a direct authority document URL, any fallback parser introduced for an official source, and a cross-programme case whose card title omits Russia while the changed record is Russian. For designation events, verify the delivery sequence separately: Telegram acknowledges the alert first, then the Russian DOCX is sent. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain covered, then enable the scheduler.
+Before enabling publication, test at least: new designation, variation, technical correction, delisting, unavailable or malformed structured list, first baseline, failed Telegram delivery, duplicate retry, Russian alert copy, canonical original-link rendering, rejection of a `news.google.com` wrapper, rejection of a non-authority host, acceptance of a direct authority document URL, any fallback parser introduced for an official source, and a cross-programme case whose card title omits Russia while the changed record is Russian. Exercise lost acknowledgements, crashes before and after receipt persistence, mismatched bindings, metadata-only duplicates, and historical holds without real sends. For designation events with alerts enabled, verify the delivery sequence separately: Telegram acknowledges the alert first, then the Russian DOCX is sent. Under documents-only policy, verify that text remains suppressed. Check the generated DOCX heading and absence of a duplicate prefix. Run one complete shadow cycle with notifications disabled, confirm all required jurisdictions remain semantically covered, then enable the scheduler only under existing authorization. These are deployment acceptance requirements; passing the bundled helper tests alone does not establish them.
 
 After a material monitoring improvement, prepare a sanitized reusable release. Run the package tests and privacy scan, publish only if both pass, and never include production configuration, runtime state, secrets, destinations, logs, or private paths. Keep repository-specific branch and push permissions outside the reusable skill.
 
