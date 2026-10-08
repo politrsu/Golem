@@ -36,7 +36,7 @@ class RenderDocxTests(unittest.TestCase):
                          "Антироссийские санкции – " + event["document_title_ru"])
         text = "\n".join(p.text for p in document.paragraphs)
         for item in event["categories"]["entities"]:
-            self.assertIn(item["name_ru"] + " — " + item["country_ru"], text)
+            self.assertIn(item["name_ru"] + " (" + item["country_ru"] + ")", text)
         self.assertIn(event["official_url"], text)
         self.assertNotIn("замораживание", text.casefold())
 
@@ -73,7 +73,7 @@ class RenderDocxTests(unittest.TestCase):
             "title_ru": "Новые санкционные ограничения",
             "official_url": "https://authority.example/original-act",
             "categories": {
-                "individuals": [{"name_ru": "Иван Иванов", "position_ru": "должность"}],
+                "individuals": [{"name_ru": "Иван Иванов", "position_ru": "Директор ООО «Пример»", "position_evidence": [{"source_url": "https://authority.example/role"}]}],
                 "vessels": [],
             },
         }
